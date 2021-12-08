@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "ES2020",
+    "moduleResolution": "node",
+    "lib": [
+      "es2017",
+      "es7",
+      "es6",
+      "dom"
+    ],
+    "declaration": true,
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "strictNullChecks": false
+  },
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
