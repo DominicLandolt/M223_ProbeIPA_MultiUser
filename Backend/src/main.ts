@@ -32,7 +32,8 @@ app.get("/signup", (req, res, next) => {
     }
     else if(userPassword != userRepeatPassword){
         res.status(422).json({ message: "Error: Field \"RepeatPassword\" must match Field \"Password\"." });
-    }else{
+    }
+    else{
         DB_CONNECTION.then(() => {
             const authDB = DB_CLIENT.db("auth");
             const usersColl = authDB.collection('users')
@@ -65,7 +66,7 @@ app.get("/signup", (req, res, next) => {
                                             if(err){
                                                 res.status(500).json({ message: "Error: Could not create new user. Please try again later." });
                                             }
-                                            else if(result == undefined || result == null){
+                                            else if(result == undefined || result == null || result == ""){
                                                 res.status(500).json({ message: "Error: Could not create new user. Please try again later." });
                                             }
                                             else{
@@ -100,6 +101,92 @@ app.get("/signup", (req, res, next) => {
                 }
             });
         });
+    }
+});
+
+app.get("/login", (req, res, next) => {
+    let userName = <string>req?.query?.UserName;
+    let userEmail = <string>req?.query?.Email;
+    let userPassword = <string>req?.query?.Password;
+
+    if((userName == null || userName == "") && (userEmail == null || userEmail == "")){
+        res.status(422).json({ message: "Error: At least one of fields \"UserName\" and \"Email\" is required." });
+    }
+    else if(userPassword == null || userPassword == ""){
+        res.status(422).json({ message: "Error: Field \"Password\" is required." });
+    }
+    else if(userName != null && userName != ""){
+        //Log in with username
+        DB_CONNECTION.then(() => {
+            const authDB = DB_CLIENT.db("auth");
+            const usersColl = authDB.collection('users')
+
+            usersColl.findOne( { name: escape(userName) }, (error: any, result: any) => {
+                if(error){
+                    res.status(500).json({ message: "Error: Could not log in. Please try again later." });
+                }
+                else if(result == null || result == undefined || result == "" || result._id == null || result._id == undefined || result._id == "" || result.name == null || result.name == undefined || result.name == "" || result.email == null || result.email == undefined || result.email == "" || result.hash == null || result.hash == undefined || result.hash == "" || result.permissions == null || result.permissions == undefined){
+                    res.status(422).json({ message: "Error: Incorrect username or password." });
+                }
+                else{
+                    var user = new User(result.name, result.email, result.hash, result.permissions);
+                    user.id = result._id;
+                    bcrypt.compare(userPassword, user.hash, function(err: any, bcResult: boolean){
+                        if(err){
+                            res.status(500).json({ message: "Error: Could not log in. Please try again later." });
+                        }
+                        else{
+                            if(bcResult){
+                                let token = jwt.sign({ user }, process.env.JWTSECRET, { algorithm: 'HS256', expiresIn: '1h' });
+                                res.status(200).json({ message: "Successfully logged in.", token });
+                            }
+                            else{
+                                res.status(422).json({ message: "Error: Incorrect username or password." });
+                            }
+                        }
+                    });
+                }
+            });
+        });
+    }
+    else{
+        if(userEmail == null || userEmail == "" || !validateEmail(userEmail)){
+            res.status(422).json({ message: "Error: Field \"Email\" is not valid." });
+        }
+        else{
+            //Log in with email
+            DB_CONNECTION.then(() => {
+                const authDB = DB_CLIENT.db("auth");
+                const usersColl = authDB.collection('users')
+
+                usersColl.findOne( { email: escape(userEmail) }, (error: any, result: any) => {
+                    if(error){
+                        res.status(500).json({ message: "Error: Could not log in. Please try again later." });
+                    }
+                    else if(result == null || result == undefined || result == "" || result._id == null || result._id == undefined || result._id == "" || result.name == null || result.name == undefined || result.name == "" || result.email == null || result.email == undefined || result.email == "" || result.hash == null || result.hash == undefined || result.hash == "" || result.permissions == null || result.permissions == undefined){
+                        res.status(422).json({ message: "Error: Incorrect email or password." });
+                    }
+                    else{
+                        var user = new User(result.name, result.email, result.hash, result.permissions);
+                        user.id = result._id;
+                        bcrypt.compare(userPassword, user.hash, function(err: any, bcResult: boolean){
+                            if(err){
+                                res.status(500).json({ message: "Error: Could not log in. Please try again later." });
+                            }
+                            else{
+                                if(bcResult){
+                                    let token = jwt.sign({ user }, process.env.JWTSECRET, { algorithm: 'HS256', expiresIn: '1h' });
+                                    res.status(200).json({ message: "Successfully logged in.", token });
+                                }
+                                else{
+                                    res.status(422).json({ message: "Error: Incorrect email or password." });
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+        }
     }
 });
 
