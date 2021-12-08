@@ -190,6 +190,48 @@ app.get("/login", (req, res, next) => {
     }
 });
 
+app.get("/checkpermission", (req, res, next) => {
+    let token = <string>req?.query?.SessionToken;
+    let permission = <string>req?.query?.Permission;
+
+    if(permission == null || permission == ""){
+        res.status(422).json({ message: "Error: Field \"Permission\" is required." });
+    }
+    else{
+        let jwtValid = isTokenValid(token);
+        if(!jwtValid.success){
+            res.status(422).json({ message: "Error: Field \"SessionToken\" is invalid. The current session might have expired." });
+        }
+        else{
+            DB_CONNECTION.then(() => {
+                const authDB = DB_CLIENT.db("auth");
+                const usersColl = authDB.collection('users')
+                usersColl.findOne( { name: jwtValid.user.name }, (error: any, result: any) => {
+                    if(error){
+                        res.status(500).json({ message: "Error: Could not check permission. Please try again later." });
+                    }
+                    else if(result == null || result == undefined || result == "" || result._id == null || result._id == undefined || result._id == "" || result.name == null || result.name == undefined || result.name == "" || result.email == null || result.email == undefined || result.email == "" || result.hash == null || result.hash == undefined || result.hash == "" || result.permissions == null || result.permissions == undefined){
+                        res.status(500).json({ message: "Error: Could not check permission. Please try again later." });
+                    }
+                    else{
+                        var user = new User(result.name, result.email, result.hash, result.permissions);
+                        user.id = result._id;
+
+                        var hasPermission = false;
+                        for (let p of user.permissions) {
+                            if(p[permission] != null && p[permission]){
+                                hasPermission = true;
+                            }
+                        }
+
+                        res.status(200).json({ message: "Permission status of permission \"" + permission + "\" is: " + hasPermission , hasPermission });
+                    }
+                });
+            });
+        }
+    }
+});
+
 function escape(message: string){
     if(message == null && message == undefined){
         return "";
@@ -198,20 +240,15 @@ function escape(message: string){
     return message.trim();
 }
 
-function isTokenValid(token: string){
-    let message;
-    if(token){
-        jwt.verify(token, process.env.JWTSECRET, (err: any, payload: any) => {
-            if(err){
-                message = { success: false };
-            }else{
-                message = { success: true, user: payload.user };
-            }
-        });
-    }
-    else{
-        message = { success: false };
-    }
+function isTokenValid(token: string): any{
+    var message = null;
+    jwt.verify(token, process.env.JWTSECRET, (err: any, payload: any) => {
+        if(err){
+            message = { success: false };
+        }else{
+            message = { success: true, user: payload.user };
+        }
+    });
     return message;
 }
 
